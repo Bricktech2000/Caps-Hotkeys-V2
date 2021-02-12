@@ -4,11 +4,10 @@
 unsigned int keyCode(char chr) { return (unsigned int)0x41 + chr - 'a'; } //a function from ascii to key codes
 const int modifierKey = VK_CAPITAL; //the modifier key used
 const char shiftKey = keyCode('d');
-const char altTabKey = 188;
+bool switchScreen = false; //a bool representing if we are in the Ctrl + Alt + Tab screen
 bool keyPressed = 0; //a bool representing if a key was pressed before the modifier key was released
 bool sendingKey = false; //a flag to re-enable key presses when the program itself is sending key presses
 bool shiftKeyHeld = false; //a flag to know if the shift key is currently held down by the program
-bool altTabKeyHeld = false; //a flag to know if the altTab key is currently held down by the program
 #define KEYEVENTF_KEYDOWN 0 //why doesn't that already exist???
 const int keyDelay = 0; //ms //the delay between output key presses
 //a struct containing a character and a pointer to a handler function
@@ -19,7 +18,8 @@ struct keyFunc{
 //some handler functions
 void keyFuncMap(unsigned int vkCode);
 void keyCtrlFuncMap(unsigned int vkCode);
-void keySelectWordFunc(unsigned int vkCode);
+void keyCtrlAltFuncMap(unsigned int vkCode);
+void keySwitchScreenFuncMap(unsigned int vkCode);
 
 
 //the handler function associated with each key
@@ -41,6 +41,8 @@ keyFunc keyFuncs[] = {
     {186/* ; */  , keyFuncMap},
     {186/* ; */  , keyCtrlFuncMap},
     {186/* ; */  , keyFuncMap},
+    {188/* , */  , keyCtrlAltFuncMap},
+    {188/* , */  , keySwitchScreenFuncMap},
     {VK_BACK     , keyFuncMap},
 };
 //the key map used in handler functions
@@ -56,6 +58,7 @@ unsigned int keyMap[][2] = {
     {190/* . */  , VK_END},
     {keyCode('p'), VK_UP},
     {186/* ; */  , VK_DOWN},
+    {188/* ; */  , VK_TAB},
     {VK_BACK     , VK_DELETE},
 };
 
@@ -82,27 +85,28 @@ void keyCtrlFuncMap(unsigned int vkCode){
     keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
     sendingKey = false;
 }
-//function that presses keys to select a word
-void keySelectWordFunc(unsigned int vkCode){
+//function that presses a key from keyMap with Ctrl + Alt held down
+void keyCtrlAltFuncMap(unsigned int vkCode){
     sendingKey = true;
-
-    //CTRL + LEFT
-    keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYDOWN, 0);
-
-    keybd_event(VK_LEFT, 0, KEYEVENTF_KEYDOWN, 0);
-    Sleep(keyDelay);
-    keybd_event(VK_LEFT, 0, KEYEVENTF_KEYUP, 0);
-
-    //CTRL + SHIFT + RIGHT
-    keybd_event(VK_LSHIFT, 0, KEYEVENTF_KEYDOWN, 0);
-    keybd_event(VK_RIGHT, 0, KEYEVENTF_KEYDOWN, 0);
-    Sleep(keyDelay);
-    keybd_event(VK_RIGHT, 0, KEYEVENTF_KEYUP, 0);
-    keybd_event(VK_LSHIFT, 0, KEYEVENTF_KEYUP, 0);
-
-    keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
-
+    keybd_event(VK_MENU, 0, KEYEVENTF_KEYDOWN, 0);
+    keyCtrlFuncMap(vkCode);
+    sendingKey = true;
+    keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0);
     sendingKey = false;
+}
+
+//function sets the switchScreen bool to 'true'
+void keySwitchScreenFuncMap(unsigned int vkCode){
+    switchScreen = true;
+}
+void exitSwitchScreen(){
+    sendingKey = true;
+    Sleep(keyDelay);
+    keybd_event(VK_RETURN, 0, KEYEVENTF_KEYDOWN, 0);
+    Sleep(keyDelay);
+    keybd_event(VK_RETURN, 0, KEYEVENTF_KEYUP, 0);
+    sendingKey = false;
+    switchScreen = false;
 }
 
 //https://www.unknowncheats.me/forum/c-and-c-/83707-setwindowshookex-example.html
@@ -124,19 +128,6 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
                     shiftKeyHeld = true;
                     foundMatch = true;
                 }
-                //if altTabKey key was pressed, then press CTRL + ALT + TAB
-                if((const char)kbdStruct.vkCode == altTabKey){
-                    if(!altTabKeyHeld){
-                        keybd_event(VK_MENU, 0, KEYEVENTF_KEYDOWN, 0);
-                        keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYDOWN, 0);
-                    }
-                    sendingKey = true;
-                    keybd_event(VK_TAB, 0, KEYEVENTF_KEYDOWN, 0);
-                    Sleep(keyDelay);
-                    keybd_event(VK_TAB, 0, KEYEVENTF_KEYUP, 0);
-                    sendingKey = false;
-                    foundMatch = true;
-                }
                 
                 for(auto kf : keyFuncs)
                     if(kf.chr == kbdStruct.vkCode){
@@ -146,6 +137,10 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
                     }
                 //if no match was found, press CTRL + key
                 if(!foundMatch){
+                    //if the switch screen is shown, exit it
+                    if(switchScreen) exitSwitchScreen();
+                    Sleep(100);
+
                     sendingKey = true;
                     keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYDOWN, 0);
                     keybd_event((unsigned int)kbdStruct.vkCode, 0, KEYEVENTF_KEYDOWN, 0);
@@ -170,16 +165,10 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
                 shiftKeyHeld = false;
             }
         }
-        //if the modifier key was released...
+        //if the modifier key was released and another key was pressed before...
         else if(wParam == WM_KEYUP /*key released*/ && kbdStruct.vkCode == modifierKey){
-            //if modifierKey key was released and altKey was pressed, then release ALT
-                std::cout << "RELEASING ALT" << std::endl;
-            if(altTabKeyHeld){
-                keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0);
-                keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
-                altTabKeyHeld = false;
-            }
-            //if another key was pressed before the modifier key...
+            //if the switch screen is shown, exit it
+            if(switchScreen) exitSwitchScreen();
             if(keyPressed == true){
                 //turn the Caps Lock 'Light' back off by simulating a key press
                 keyPressed = false;
@@ -213,7 +202,7 @@ int main()
     std::cout << "  - CAPS + .:  end" << std::endl;
     std::cout << "  - CAPS + p:  scroll up" << std::endl;
     std::cout << "  - CAPS + ;:  scroll down" << std::endl;
-    std::cout << "  - CAPS + ,:  select current word" << std::endl;
+    std::cout << "  - CAPS + ,:  switch apps" << std::endl;
     std::cout << "  - CAPS + BS: del" << std::endl;
     std::cout << "  - CAPS + d:  SHIFT" << std::endl;
     std::cout << "  - CAPS + ?:  CTRL + ?" << std::endl << std::endl;
