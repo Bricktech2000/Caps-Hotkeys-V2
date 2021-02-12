@@ -1,14 +1,16 @@
 #include <iostream>
 #include <windows.h>
 
+unsigned int keyCode(char chr) { return (unsigned int)0x41 + chr - 'a'; } //a function from ascii to key codes
 const int modifierKey = VK_CAPITAL; //the modifier key used
-const char shiftKey = 'd';
+const char shiftKey = keyCode('d');
+const char altTabKey = 188;
 bool keyPressed = 0; //a bool representing if a key was pressed before the modifier key was released
 bool sendingKey = false; //a flag to re-enable key presses when the program itself is sending key presses
 bool shiftKeyHeld = false; //a flag to know if the shift key is currently held down by the program
+bool altTabKeyHeld = false; //a flag to know if the altTab key is currently held down by the program
 #define KEYEVENTF_KEYDOWN 0 //why doesn't that already exist???
-const int keyDelay = 1; //ms //the delay between output key presses
-unsigned int keyCode(char chr) { return (unsigned int)0x41 + chr - 'a'; } //a function from ascii to key codes
+const int keyDelay = 0; //ms //the delay between output key presses
 //a struct containing a character and a pointer to a handler function
 struct keyFunc{
     unsigned int chr;
@@ -35,15 +37,10 @@ keyFunc keyFuncs[] = {
     {keyCode('p'), keyFuncMap},
     {keyCode('p'), keyCtrlFuncMap},
     {keyCode('p'), keyFuncMap},
-    {keyCode('p'), keyCtrlFuncMap},
-    {keyCode('p'), keyFuncMap},
     {186/* ; */  , keyCtrlFuncMap},
     {186/* ; */  , keyFuncMap},
     {186/* ; */  , keyCtrlFuncMap},
     {186/* ; */  , keyFuncMap},
-    {186/* ; */  , keyCtrlFuncMap},
-    {186/* ; */  , keyFuncMap},
-    {188/* , */  , keySelectWordFunc},
     {VK_BACK     , keyFuncMap},
 };
 //the key map used in handler functions
@@ -122,9 +119,22 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
 
                 bool foundMatch = false;
                 //if shiftKey key was pressed, then press SHIFT
-                if (kbdStruct.vkCode == keyCode(shiftKey)){
+                if((const char)kbdStruct.vkCode == shiftKey){
                     if(!shiftKeyHeld) keybd_event(VK_SHIFT, 0, KEYEVENTF_KEYDOWN, 0);
                     shiftKeyHeld = true;
+                    foundMatch = true;
+                }
+                //if altTabKey key was pressed, then press CTRL + ALT + TAB
+                if((const char)kbdStruct.vkCode == altTabKey){
+                    if(!altTabKeyHeld){
+                        keybd_event(VK_MENU, 0, KEYEVENTF_KEYDOWN, 0);
+                        keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYDOWN, 0);
+                    }
+                    sendingKey = true;
+                    keybd_event(VK_TAB, 0, KEYEVENTF_KEYDOWN, 0);
+                    Sleep(keyDelay);
+                    keybd_event(VK_TAB, 0, KEYEVENTF_KEYUP, 0);
+                    sendingKey = false;
                     foundMatch = true;
                 }
                 
@@ -153,23 +163,33 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
                 && c != VK_MENU && c != VK_LMENU && c != VK_RMENU) return 1;
             }
         }
-        //if shiftKey key was released, then release SHIFT
-        else if(wParam == WM_KEYUP /*key pressed down*/ && kbdStruct.vkCode != modifierKey && !sendingKey){
-            if(kbdStruct.vkCode == keyCode(shiftKey)){
+        else if(wParam == WM_KEYUP /*key released*/ && kbdStruct.vkCode != modifierKey && !sendingKey){
+            //if shiftKey key was released, then release SHIFT
+            if(kbdStruct.vkCode == shiftKey){
                 if(shiftKeyHeld) keybd_event(VK_SHIFT, 0, KEYEVENTF_KEYUP, 0);
                 shiftKeyHeld = false;
             }
         }
-        //if the modifier key was released and another key was pressed before...
-        else if(wParam == WM_KEYUP /*key released*/ && kbdStruct.vkCode == modifierKey && keyPressed == true){
-            //turn the Caps Lock 'Light' back off by simulating a key press
-            keyPressed = false;
-            Sleep(keyDelay);
-            keybd_event(modifierKey, 0, KEYEVENTF_KEYUP, 0);
-            Sleep(keyDelay);
-            keybd_event(modifierKey, 0, KEYEVENTF_KEYDOWN, 0);
-            Sleep(keyDelay);
-            keybd_event(modifierKey, 0, KEYEVENTF_KEYUP, 0);
+        //if the modifier key was released...
+        else if(wParam == WM_KEYUP /*key released*/ && kbdStruct.vkCode == modifierKey){
+            //if modifierKey key was released and altKey was pressed, then release ALT
+                std::cout << "RELEASING ALT" << std::endl;
+            if(altTabKeyHeld){
+                keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0);
+                keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
+                altTabKeyHeld = false;
+            }
+            //if another key was pressed before the modifier key...
+            if(keyPressed == true){
+                //turn the Caps Lock 'Light' back off by simulating a key press
+                keyPressed = false;
+                Sleep(keyDelay);
+                keybd_event(modifierKey, 0, KEYEVENTF_KEYUP, 0);
+                Sleep(keyDelay);
+                keybd_event(modifierKey, 0, KEYEVENTF_KEYDOWN, 0);
+                Sleep(keyDelay);
+                keybd_event(modifierKey, 0, KEYEVENTF_KEYUP, 0);
+            }
         }
     }else{
         std::cout << "\r" << "Invalid Action. Calling next hook.                 " << std::endl;
