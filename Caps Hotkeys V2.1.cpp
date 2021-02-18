@@ -1,6 +1,16 @@
 #include <iostream>
 #include <windows.h>
+
 #include <chrono>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <thread>
+#include <future>
+#include <functional>
+
+using namespace std::chrono_literals;
+
 
 unsigned int keyCode(char chr) { return (unsigned int)0x41 + chr - 'a'; } //a function from ascii to key codes
 const int modifierKey = VK_CAPITAL; //the modifier key used
@@ -13,6 +23,7 @@ bool shiftKeyHeld = false; //a flag to know if the shift key is currently held d
 bool winKeyHeld = false; //a flag to know if the windows key is currently held down by the program
 #define KEYEVENTF_KEYDOWN 0 //why doesn't that already exist???
 const int keyDelay = 0; //ms //the delay between output key presses
+auto lowLevelTimeout = 200ms; //a timeout to prevent Windows from unregistering the keyboard hook
 //a struct containing a character and a pointer to a handler function
 struct keyFunc{
     unsigned int chr;
@@ -120,23 +131,14 @@ void exitSwitchScreen(){
     switchScreen = false;
 }
 
-
 //https://www.unknowncheats.me/forum/c-and-c-/83707-setwindowshookex-example.html
 //https://stackoverflow.com/questions/48695720/setwindowshookex-hook-stops-working
 LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
-    auto start = std::chrono::steady_clock::now();
     //get information about the key in kbdStruct
     KBDLLHOOKSTRUCT kbdStruct = *((KBDLLHOOKSTRUCT*)lParam);
     //if the action is valid...
-    std::cout << "called callback: KeyboardProc" << std::endl;
     if(nCode >= 0 /*valid action*/){
         //if a key is pressed (and is not the modifier key)...
-        bool isCaps = kbdStruct.vkCode == modifierKey;
-        bool isShift = kbdStruct.vkCode == shiftKey;
-        bool isSending = sendingKey;
-        bool isModifier = GetKeyState(modifierKey) & 0x8000;
-        bool isKeyDown = wParam == WM_KEYDOWN;
-        std::cout << "isCaps: " << isCaps << " isSending: " << isSending << " isModifier: " << isModifier << " isKeyDown: " << isKeyDown << " isShift: " << isShift << std::endl;
         if(wParam == WM_KEYDOWN /*key pressed down*/ && kbdStruct.vkCode != modifierKey && !sendingKey){
             //if the modifier key is pressed, then call the corresponding handler function with the corresponding key map
             if(GetKeyState(modifierKey) & 0x8000){
@@ -220,13 +222,42 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
     }else{
         std::cout << "\r" << "Invalid Action. Calling next hook.                 " << std::endl;
     }
-    //https://en.cppreference.com/w/cpp/chrono
-    auto end = std::chrono::steady_clock::now();
-    std::chrono::duration<double> duration = end - start;
-    if(duration.count() > .1) std::cout << "keyboardProc duration: " << duration.count() << std::endl;
     //otherwise, do not intercept the key press
     return CallNextHookEx(NULL /*ignored*/, nCode, wParam, lParam);
 }
+
+//https://stackoverflow.com/questions/40550730/how-to-implement-timeout-for-function-in-c
+//wrapper function to prevent Windows from unhooking the low-level hook function because of timeout
+template <typename TF, typename TDuration, class... TArgs>
+std::result_of_t<TF&&(TArgs&&...)> run_with_timeout(TF&& f, TDuration timeout, TArgs&&... args){
+    using R = std::result_of_t<TF&&(TArgs&&...)>;
+    std::packaged_task<R(TArgs...)> task(f);
+    auto future = task.get_future();
+    std::thread thr(std::move(task), std::forward<TArgs>(args)...);
+    if (future.wait_for(timeout) != std::future_status::timeout)
+    {
+       thr.join();
+       return future.get(); // this will propagate exception from f() if any
+    }
+    else
+    {
+       thr.detach(); // we leave the thread still running
+       throw std::runtime_error("Timeout");
+    }
+}
+
+LRESULT CALLBACK KeyboardProcWrapper(int nCode, WPARAM wParam, LPARAM lParam){
+    return run_with_timeout(KeyboardProc, .1s, nCode, wParam, lParam);
+}
+//`Callback` is the cause of the huge error message
+/*LRESULT f(int a){
+    std::cout << "a" << std::endl;
+    return 1;
+}
+
+LRESULT CALLBACK KeyboardProcWrapper(int nCode, WPARAM wParam, LPARAM lParam){
+    return run_with_timeout(f, .1s, 123);
+}*/
 
 int main()
 {
@@ -254,10 +285,10 @@ int main()
     //register a key hook (the secret to making this work)
     HHOOK keybdHook;
     //https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowshookexa
-    if(!(keybdHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, NULL, 0))){
+    if(!(keybdHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProcWrapper, NULL, 0))){
         std::cout << "An error occured when registering the keyboard hook." << std::endl;
     };
-
+    /*KeyboardProcWrapper(0, 0, 0);*/
     //this is needed for some reason
     MSG msg;
     while(GetMessage(&msg, NULL, 0, 0)){}
