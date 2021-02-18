@@ -133,7 +133,8 @@ void exitSwitchScreen(){
 
 //https://www.unknowncheats.me/forum/c-and-c-/83707-setwindowshookex-example.html
 //https://stackoverflow.com/questions/48695720/setwindowshookex-hook-stops-working
-LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
+//`CALLBACK` is the cause of the huge error message
+LRESULT KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
     //get information about the key in kbdStruct
     KBDLLHOOKSTRUCT kbdStruct = *((KBDLLHOOKSTRUCT*)lParam);
     //if the action is valid...
@@ -183,7 +184,7 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
                     std::cout << "\rCAPS + " << kbdStruct.vkCode << " detected. Sending corresponding key.  "; //spaces for vkCode.str()
                 }
                 //otherwise, do not intercept the key press
-                if(!foundMatch) return CallNextHookEx(NULL /*ignored*/, nCode, wParam, lParam);
+                if(!foundMatch) return 0;
                 //https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms644985(v=vs.85) in section 'Return value'
                 //prevent the hook from propagating (aka freaking disable the keyboard), but allow modifier keys to be pressed
                 unsigned int c = kbdStruct.vkCode;
@@ -223,7 +224,7 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
         std::cout << "\r" << "Invalid Action. Calling next hook.                 " << std::endl;
     }
     //otherwise, do not intercept the key press
-    return CallNextHookEx(NULL /*ignored*/, nCode, wParam, lParam);
+    return 0;
 }
 
 //https://stackoverflow.com/questions/40550730/how-to-implement-timeout-for-function-in-c
@@ -242,22 +243,19 @@ std::result_of_t<TF&&(TArgs&&...)> run_with_timeout(TF&& f, TDuration timeout, T
     else
     {
        thr.detach(); // we leave the thread still running
-       throw std::runtime_error("Timeout");
+       //thr.join();
+       //throw std::runtime_error("Timeout");
+       std::cout << "\r" << "Timeout Error. Calling next hook.                 " << std::endl;
+       //otherwise, do not intercept the key press
+       return 0;
     }
 }
 
 LRESULT CALLBACK KeyboardProcWrapper(int nCode, WPARAM wParam, LPARAM lParam){
-    return run_with_timeout(KeyboardProc, .1s, nCode, wParam, lParam);
+    LRESULT res = run_with_timeout(KeyboardProc, 250ms, std::forward<int>(nCode), std::forward<WPARAM>(wParam), std::forward<LPARAM>(lParam));
+    if(res == 0) return CallNextHookEx(NULL /*ignored*/, std::forward<int>(nCode), std::forward<WPARAM>(wParam), std::forward<LPARAM>(lParam));
+    else return 1;
 }
-//`Callback` is the cause of the huge error message
-/*LRESULT f(int a){
-    std::cout << "a" << std::endl;
-    return 1;
-}
-
-LRESULT CALLBACK KeyboardProcWrapper(int nCode, WPARAM wParam, LPARAM lParam){
-    return run_with_timeout(f, .1s, 123);
-}*/
 
 int main()
 {
@@ -288,7 +286,6 @@ int main()
     if(!(keybdHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProcWrapper, NULL, 0))){
         std::cout << "An error occured when registering the keyboard hook." << std::endl;
     };
-    /*KeyboardProcWrapper(0, 0, 0);*/
     //this is needed for some reason
     MSG msg;
     while(GetMessage(&msg, NULL, 0, 0)){}
