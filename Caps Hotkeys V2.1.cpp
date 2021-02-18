@@ -133,8 +133,7 @@ void exitSwitchScreen(){
 
 //https://www.unknowncheats.me/forum/c-and-c-/83707-setwindowshookex-example.html
 //https://stackoverflow.com/questions/48695720/setwindowshookex-hook-stops-working
-//`CALLBACK` is the cause of the huge error message
-LRESULT KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
+LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
     //get information about the key in kbdStruct
     KBDLLHOOKSTRUCT kbdStruct = *((KBDLLHOOKSTRUCT*)lParam);
     //if the action is valid...
@@ -165,13 +164,13 @@ LRESULT KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
                     if(kf.chr == kbdStruct.vkCode){
                         foundMatch = true;
                         kf.func(kbdStruct.vkCode);
-                        std::cout << "CAPS + " << kbdStruct.vkCode << " detected. Sending corresponding key.  " << std::endl; //spaces for vkCode.str()
+                        //std::cout << "CAPS + " << kbdStruct.vkCode << " detected. Sending corresponding key.  " << std::endl; //spaces for vkCode.str()
                     }
                 //if no match was found and the windows key is not pressed, send CTRL + key
                 if(!foundMatch && !winKeyHeld){
                     //if the switch screen is shown, exit it
                     if(switchScreen) exitSwitchScreen();
-                    Sleep(100);
+                    Sleep(25);
 
                     sendingKey = true;
                     keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYDOWN, 0);
@@ -181,7 +180,7 @@ LRESULT KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
                     keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
                     sendingKey = false;
                     foundMatch = true;
-                    std::cout << "\rCAPS + " << kbdStruct.vkCode << " detected. Sending corresponding key.  "; //spaces for vkCode.str()
+                    //std::cout << "\rCAPS + " << kbdStruct.vkCode << " detected. Sending corresponding key.  "; //spaces for vkCode.str()
                 }
                 //otherwise, do not intercept the key press
                 if(!foundMatch) return 0;
@@ -221,40 +220,10 @@ LRESULT KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
             }
         }
     }else{
-        std::cout << "\r" << "Invalid Action. Calling next hook.                 " << std::endl;
+        //std::cout << "\r" << "Invalid Action. Calling next hook.                 " << std::endl;
     }
     //otherwise, do not intercept the key press
     return 0;
-}
-
-//https://stackoverflow.com/questions/40550730/how-to-implement-timeout-for-function-in-c
-//wrapper function to prevent Windows from unhooking the low-level hook function because of timeout
-template <typename TF, typename TDuration, class... TArgs>
-std::result_of_t<TF&&(TArgs&&...)> run_with_timeout(TF&& f, TDuration timeout, TArgs&&... args){
-    using R = std::result_of_t<TF&&(TArgs&&...)>;
-    std::packaged_task<R(TArgs...)> task(f);
-    auto future = task.get_future();
-    std::thread thr(std::move(task), std::forward<TArgs>(args)...);
-    if (future.wait_for(timeout) != std::future_status::timeout)
-    {
-       thr.join();
-       return future.get(); // this will propagate exception from f() if any
-    }
-    else
-    {
-       thr.detach(); // we leave the thread still running
-       //thr.join();
-       //throw std::runtime_error("Timeout");
-       std::cout << "\r" << "Timeout Error. Calling next hook.                 " << std::endl;
-       //otherwise, do not intercept the key press
-       return 0;
-    }
-}
-
-LRESULT CALLBACK KeyboardProcWrapper(int nCode, WPARAM wParam, LPARAM lParam){
-    LRESULT res = run_with_timeout(KeyboardProc, 250ms, std::forward<int>(nCode), std::forward<WPARAM>(wParam), std::forward<LPARAM>(lParam));
-    if(res == 0) return CallNextHookEx(NULL /*ignored*/, std::forward<int>(nCode), std::forward<WPARAM>(wParam), std::forward<LPARAM>(lParam));
-    else return 1;
 }
 
 int main()
@@ -283,7 +252,7 @@ int main()
     //register a key hook (the secret to making this work)
     HHOOK keybdHook;
     //https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowshookexa
-    if(!(keybdHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProcWrapper, NULL, 0))){
+    if(!(keybdHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, NULL, 0))){
         std::cout << "An error occured when registering the keyboard hook." << std::endl;
     };
     //this is needed for some reason
