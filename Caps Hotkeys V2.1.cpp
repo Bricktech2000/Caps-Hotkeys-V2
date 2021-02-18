@@ -1,13 +1,16 @@
 #include <iostream>
 #include <windows.h>
+#include <chrono>
 
 unsigned int keyCode(char chr) { return (unsigned int)0x41 + chr - 'a'; } //a function from ascii to key codes
 const int modifierKey = VK_CAPITAL; //the modifier key used
 const char shiftKey = keyCode('d');
+const char winKey = keyCode('b');
 bool switchScreen = false; //a bool representing if we are in the Ctrl + Alt + Tab screen
 bool keyPressed = 0; //a bool representing if a key was pressed before the modifier key was released
 bool sendingKey = false; //a flag to re-enable key presses when the program itself is sending key presses
 bool shiftKeyHeld = false; //a flag to know if the shift key is currently held down by the program
+bool winKeyHeld = false; //a flag to know if the windows key is currently held down by the program
 #define KEYEVENTF_KEYDOWN 0 //why doesn't that already exist???
 const int keyDelay = 0; //ms //the delay between output key presses
 //a struct containing a character and a pointer to a handler function
@@ -20,6 +23,7 @@ void keyFuncMap(unsigned int vkCode);
 void keyCtrlFuncMap(unsigned int vkCode);
 void keyCtrlAltFuncMap(unsigned int vkCode);
 void keySwitchScreenFuncMap(unsigned int vkCode);
+void keyCancelSwitchFuncMap(unsigned int vkCode);
 
 
 //the handler function associated with each key
@@ -41,6 +45,8 @@ keyFunc keyFuncs[] = {
     {186/* ; */  , keyFuncMap},
     {186/* ; */  , keyCtrlFuncMap},
     {186/* ; */  , keyFuncMap},
+    {keyCode('q'), keyFuncMap},
+    {keyCode('q'), keyCancelSwitchFuncMap},
     {188/* , */  , keyCtrlAltFuncMap},
     {188/* , */  , keySwitchScreenFuncMap},
     {VK_BACK     , keyFuncMap},
@@ -59,6 +65,7 @@ unsigned int keyMap[][2] = {
     {keyCode('p'), VK_UP},
     {186/* ; */  , VK_DOWN},
     {188/* ; */  , VK_TAB},
+    {keyCode('q'), VK_ESCAPE},
     {VK_BACK     , VK_DELETE},
 };
 
@@ -99,6 +106,10 @@ void keyCtrlAltFuncMap(unsigned int vkCode){
 void keySwitchScreenFuncMap(unsigned int vkCode){
     switchScreen = true;
 }
+//function sets the switchScreen bool to 'false'
+void keyCancelSwitchFuncMap(unsigned int vkCode){
+    switchScreen = false;
+}
 void exitSwitchScreen(){
     sendingKey = true;
     Sleep(keyDelay);
@@ -109,13 +120,23 @@ void exitSwitchScreen(){
     switchScreen = false;
 }
 
+
 //https://www.unknowncheats.me/forum/c-and-c-/83707-setwindowshookex-example.html
+//https://stackoverflow.com/questions/48695720/setwindowshookex-hook-stops-working
 LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
+    auto start = std::chrono::steady_clock::now();
     //get information about the key in kbdStruct
     KBDLLHOOKSTRUCT kbdStruct = *((KBDLLHOOKSTRUCT*)lParam);
     //if the action is valid...
+    std::cout << "called callback: KeyboardProc" << std::endl;
     if(nCode >= 0 /*valid action*/){
         //if a key is pressed (and is not the modifier key)...
+        bool isCaps = kbdStruct.vkCode == modifierKey;
+        bool isShift = kbdStruct.vkCode == shiftKey;
+        bool isSending = sendingKey;
+        bool isModifier = GetKeyState(modifierKey) & 0x8000;
+        bool isKeyDown = wParam == WM_KEYDOWN;
+        std::cout << "isCaps: " << isCaps << " isSending: " << isSending << " isModifier: " << isModifier << " isKeyDown: " << isKeyDown << " isShift: " << isShift << std::endl;
         if(wParam == WM_KEYDOWN /*key pressed down*/ && kbdStruct.vkCode != modifierKey && !sendingKey){
             //if the modifier key is pressed, then call the corresponding handler function with the corresponding key map
             if(GetKeyState(modifierKey) & 0x8000){
@@ -128,15 +149,23 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
                     shiftKeyHeld = true;
                     foundMatch = true;
                 }
+                //if winKey key was pressed, then press the Windows key
+                if((const char)kbdStruct.vkCode == winKey){
+                    sendingKey = true;
+                    if(!winKeyHeld) keybd_event(VK_LWIN, 0, KEYEVENTF_KEYDOWN, 0);
+                    winKeyHeld = true;
+                    foundMatch = true;
+                    sendingKey = false;
+                }
                 
                 for(auto kf : keyFuncs)
                     if(kf.chr == kbdStruct.vkCode){
                         foundMatch = true;
                         kf.func(kbdStruct.vkCode);
-                        std::cout << "\rCAPS + " << kbdStruct.vkCode << " detected. Sending corresponding key.  "; //spaces for vkCode.str()
+                        std::cout << "CAPS + " << kbdStruct.vkCode << " detected. Sending corresponding key.  " << std::endl; //spaces for vkCode.str()
                     }
-                //if no match was found, press CTRL + key
-                if(!foundMatch){
+                //if no match was found and the windows key is not pressed, send CTRL + key
+                if(!foundMatch && !winKeyHeld){
                     //if the switch screen is shown, exit it
                     if(switchScreen) exitSwitchScreen();
                     Sleep(100);
@@ -148,8 +177,11 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
                     keybd_event((unsigned int)kbdStruct.vkCode, 0, KEYEVENTF_KEYUP, 0);
                     keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
                     sendingKey = false;
+                    foundMatch = true;
                     std::cout << "\rCAPS + " << kbdStruct.vkCode << " detected. Sending corresponding key.  "; //spaces for vkCode.str()
                 }
+                //otherwise, do not intercept the key press
+                if(!foundMatch) return CallNextHookEx(NULL /*ignored*/, nCode, wParam, lParam);
                 //https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms644985(v=vs.85) in section 'Return value'
                 //prevent the hook from propagating (aka freaking disable the keyboard), but allow modifier keys to be pressed
                 unsigned int c = kbdStruct.vkCode;
@@ -163,6 +195,11 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
             if(kbdStruct.vkCode == shiftKey){
                 if(shiftKeyHeld) keybd_event(VK_SHIFT, 0, KEYEVENTF_KEYUP, 0);
                 shiftKeyHeld = false;
+            }
+            //if winKey key was released, then release the Windows key
+            if(kbdStruct.vkCode == winKey){
+                if(winKeyHeld) keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, 0);
+                winKeyHeld = false;
             }
         }
         //if the modifier key was released and another key was pressed before...
@@ -183,6 +220,10 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
     }else{
         std::cout << "\r" << "Invalid Action. Calling next hook.                 " << std::endl;
     }
+    //https://en.cppreference.com/w/cpp/chrono
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> duration = end - start;
+    if(duration.count() > .1) std::cout << "keyboardProc duration: " << duration.count() << std::endl;
     //otherwise, do not intercept the key press
     return CallNextHookEx(NULL /*ignored*/, nCode, wParam, lParam);
 }
@@ -202,9 +243,11 @@ int main()
     std::cout << "  - CAPS + .:  end" << std::endl;
     std::cout << "  - CAPS + p:  scroll up" << std::endl;
     std::cout << "  - CAPS + ;:  scroll down" << std::endl;
+    std::cout << "  - CAPS + q:  escape" << std::endl;
     std::cout << "  - CAPS + ,:  switch apps" << std::endl;
     std::cout << "  - CAPS + BS: del" << std::endl;
     std::cout << "  - CAPS + d:  SHIFT" << std::endl;
+    std::cout << "  - CAPS + b:  Win" << std::endl;
     std::cout << "  - CAPS + ?:  CTRL + ?" << std::endl << std::endl;
     std::cout << "Listenning for HotKeys." << std::endl << std::endl;
 
