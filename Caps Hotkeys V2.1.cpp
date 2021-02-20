@@ -183,7 +183,7 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
                     //std::cout << "\rCAPS + " << kbdStruct.vkCode << " detected. Sending corresponding key.  "; //spaces for vkCode.str()
                 }
                 //otherwise, do not intercept the key press
-                if(!foundMatch) return 0;
+                if(!foundMatch) return CallNextHookEx(NULL, nCode, wParam, lParam);
                 //https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms644985(v=vs.85) in section 'Return value'
                 //prevent the hook from propagating (aka freaking disable the keyboard), but allow modifier keys to be pressed
                 unsigned int c = kbdStruct.vkCode;
@@ -223,11 +223,10 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
         //std::cout << "\r" << "Invalid Action. Calling next hook.                 " << std::endl;
     }
     //otherwise, do not intercept the key press
-    return 0;
+    return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
 
-int main()
-{
+int main(){
     //print some information about the program
     std::cout << "This program uses pre-defined key combinations to type other keys" << std::endl;
     std::cout << "Here are some key combinations that are included in the program:" << std::endl;
