@@ -229,6 +229,11 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
 int main(){
     //print some information about the program
     std::cout << "This program uses pre-defined key combinations to type other keys" << std::endl;
+    //windows low level hook timeout
+    //https://stackoverflow.com/questions/28590742/windows-low-level-key-hook-stops-working-not-a-timeout-issue
+    //https://superuser.com/questions/1332901/what-is-keyboard-hook-timeout-value-and-should-it-be-changed-to-accommodate-vm
+    //https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms644985(v=vs.85)?redirectedfrom=MSDN
+    std::cout << "For optimal performance, increase the LowLevelHooksTimeout value under HKEY_CURRENT_USER\\Control Panel\\Desktop" << std::endl;
     std::cout << "Here are some key combinations that are included in the program:" << std::endl;
     std::cout << "  - CAPS + u:  CTRL + left arrow" << std::endl;
     std::cout << "  - CAPS + o:  CTRL + right arrow" << std::endl;
