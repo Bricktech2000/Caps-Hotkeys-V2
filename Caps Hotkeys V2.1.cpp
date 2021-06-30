@@ -48,14 +48,14 @@ keyFunc keyFuncs[] = {
     {keyCode('l'), keyFuncMap},
     {keyCode('m'), keyFuncMap},
     {190/* . */  , keyFuncMap},
-    {keyCode('p'), keyCtrlFuncMap},
-    {keyCode('p'), keyFuncMap},
-    {keyCode('p'), keyCtrlFuncMap},
-    {keyCode('p'), keyFuncMap},
-    {186/* ; */  , keyCtrlFuncMap},
-    {186/* ; */  , keyFuncMap},
-    {186/* ; */  , keyCtrlFuncMap},
-    {186/* ; */  , keyFuncMap},
+    {219/* [ */, keyCtrlFuncMap},
+    {219/* [ */, keyCtrlFuncMap},
+    {219/* [ */, keyFuncMap},
+    {219/* [ */, keyFuncMap},
+    {222/* ; */  , keyCtrlFuncMap},
+    {222/* ; */  , keyCtrlFuncMap},
+    {222/* ; */  , keyFuncMap},
+    {222/* ; */  , keyFuncMap},
     {keyCode('q'), keyFuncMap},
     {keyCode('q'), keyCancelSwitchFuncMap},
     {188/* , */  , keyCtrlAltFuncMap},
@@ -73,8 +73,8 @@ unsigned int keyMap[][2] = {
     {keyCode('l'), VK_RIGHT},
     {keyCode('m'), VK_HOME},
     {190/* . */  , VK_END},
-    {keyCode('p'), VK_UP},
-    {186/* ; */  , VK_DOWN},
+    {219/* [ */, VK_UP},
+    {222/* ' */  , VK_DOWN},
     {188/* ; */  , VK_TAB},
     {keyCode('q'), VK_ESCAPE},
     {VK_BACK     , VK_DELETE},
@@ -243,8 +243,8 @@ int main(){
     std::cout << "  - CAPS + l:  right arrow" << std::endl;
     std::cout << "  - CAPS + m:  home" << std::endl;
     std::cout << "  - CAPS + .:  end" << std::endl;
-    std::cout << "  - CAPS + p:  scroll up" << std::endl;
-    std::cout << "  - CAPS + ;:  scroll down" << std::endl;
+    std::cout << "  - CAPS + [:  scroll up" << std::endl;
+    std::cout << "  - CAPS + ':  scroll down" << std::endl;
     std::cout << "  - CAPS + q:  escape" << std::endl;
     std::cout << "  - CAPS + ,:  switch apps" << std::endl;
     std::cout << "  - CAPS + BS: del" << std::endl;

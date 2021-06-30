@@ -25,8 +25,8 @@ Below is a list of all key bindings the program implements. Note that if a bindi
 * `CAPS + l`:  right arrow
 * `CAPS + m`:  home
 * `CAPS + .`:  end
-* `CAPS + p`:  scroll up
-* `CAPS + ;`:  scroll down
+* `CAPS + [`:  scroll up
+* `CAPS + '`:  scroll down
 * `CAPS + q`:  escape
 * `CAPS + ,`:  switch apps
 * `CAPS + BS`: del
