@@ -136,10 +136,12 @@ void exitSwitchScreen(){
 LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
     //get information about the key in kbdStruct
     KBDLLHOOKSTRUCT kbdStruct = *((KBDLLHOOKSTRUCT*)lParam);
+    //if the program is currently sending key presses, do not intercept them
+    if(sendingKey) return CallNextHookEx(NULL, nCode, wParam, lParam);
     //if the action is valid...
     if(nCode >= 0 /*valid action*/){
         //if a key is pressed (and is not the modifier key)...
-        if(wParam == WM_KEYDOWN /*key pressed down*/ && kbdStruct.vkCode != modifierKey && !sendingKey){
+        if(wParam == WM_KEYDOWN /*key pressed down*/ && kbdStruct.vkCode != modifierKey){
             //if the modifier key is pressed, then call the corresponding handler function with the corresponding key map
             if(GetKeyState(modifierKey) & 0x8000){
                 keyPressed = true;
@@ -147,9 +149,11 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
                 bool foundMatch = false;
                 //if shiftKey key was pressed, then press SHIFT
                 if((const char)kbdStruct.vkCode == shiftKey){
+                    sendingKey = true;
                     if(!shiftKeyHeld) keybd_event(VK_SHIFT, 0, KEYEVENTF_KEYDOWN, 0);
                     shiftKeyHeld = true;
                     foundMatch = true;
+                    sendingKey = false;
                 }
                 //if winKey key was pressed, then press the Windows key
                 if((const char)kbdStruct.vkCode == winKey){
@@ -192,7 +196,7 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
                 && c != VK_MENU && c != VK_LMENU && c != VK_RMENU) return 1;
             }
         }
-        else if(wParam == WM_KEYUP /*key released*/ && kbdStruct.vkCode != modifierKey && !sendingKey){
+        else if(wParam == WM_KEYUP /*key released*/ && kbdStruct.vkCode != modifierKey){
             //if shiftKey key was released, then release SHIFT
             if(kbdStruct.vkCode == shiftKey){
                 if(shiftKeyHeld) keybd_event(VK_SHIFT, 0, KEYEVENTF_KEYUP, 0);
@@ -211,12 +215,14 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
             if(keyPressed == true){
                 //turn the Caps Lock 'Light' back off by simulating a key press
                 keyPressed = false;
+                sendingKey = true;
                 Sleep(keyDelay);
                 keybd_event(modifierKey, 0, KEYEVENTF_KEYUP, 0);
                 Sleep(keyDelay);
                 keybd_event(modifierKey, 0, KEYEVENTF_KEYDOWN, 0);
                 Sleep(keyDelay);
                 keybd_event(modifierKey, 0, KEYEVENTF_KEYUP, 0);
+                sendingKey = false;
             }
         }
     }else{
