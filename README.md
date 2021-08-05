@@ -9,7 +9,7 @@ Compilation
 To compile the program, simply use any C++ compiler. Unfortunately, for the time being, it doesn't work on Linux since it uses Windows-specific API functions. Here's an example using `G++`:
 
 ```shell
-g++ '.\Caps Hotkeys V2.1.cpp' -o '.\Caps Hotkeys V2.1.exe'
+g++ '.\Caps Hotkeys V2.1.cpp' -Wall -O3 -o '.\Caps Hotkeys V2.1.exe'
 ```
 
 Functionality
