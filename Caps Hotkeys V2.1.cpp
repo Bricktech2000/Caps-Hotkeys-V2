@@ -22,8 +22,6 @@ bool sendingKey = false; //a flag to re-enable key presses when the program itse
 bool shiftKeyHeld = false; //a flag to know if the shift key is currently held down by the program
 bool winKeyHeld = false; //a flag to know if the windows key is currently held down by the program
 #define KEYEVENTF_KEYDOWN 0 //why doesn't that already exist???
-const int keyDelay = 0; //ms //the delay between output key presses
-auto lowLevelTimeout = 200ms; //a timeout to prevent Windows from unregistering the keyboard hook
 //a struct containing a character and a pointer to a handler function
 struct keyFunc{
     unsigned int chr;
@@ -88,7 +86,6 @@ void keyFuncMap(unsigned int vkCode){
             //send the corresponding key code
             sendingKey = true;
             keybd_event(km[1], 0, KEYEVENTF_KEYDOWN, 0);
-            Sleep(keyDelay);
             keybd_event(km[1], 0, KEYEVENTF_KEYUP, 0);
             sendingKey = false;
         }
@@ -123,9 +120,7 @@ void keyCancelSwitchFuncMap(unsigned int vkCode){
 }
 void exitSwitchScreen(){
     sendingKey = true;
-    Sleep(keyDelay);
     keybd_event(VK_RETURN, 0, KEYEVENTF_KEYDOWN, 0);
-    Sleep(keyDelay);
     keybd_event(VK_RETURN, 0, KEYEVENTF_KEYUP, 0);
     sendingKey = false;
     switchScreen = false;
@@ -174,12 +169,10 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
                 if(!foundMatch && !winKeyHeld){
                     //if the switch screen is shown, exit it
                     if(switchScreen) exitSwitchScreen();
-                    Sleep(25);
 
                     sendingKey = true;
                     keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYDOWN, 0);
                     keybd_event((unsigned int)kbdStruct.vkCode, 0, KEYEVENTF_KEYDOWN, 0);
-                    Sleep(keyDelay);
                     keybd_event((unsigned int)kbdStruct.vkCode, 0, KEYEVENTF_KEYUP, 0);
                     keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
                     sendingKey = false;
@@ -216,11 +209,8 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
                 //turn the Caps Lock 'Light' back off by simulating a key press
                 keyPressed = false;
                 sendingKey = true;
-                Sleep(keyDelay);
                 keybd_event(modifierKey, 0, KEYEVENTF_KEYUP, 0);
-                Sleep(keyDelay);
                 keybd_event(modifierKey, 0, KEYEVENTF_KEYDOWN, 0);
-                Sleep(keyDelay);
                 keybd_event(modifierKey, 0, KEYEVENTF_KEYUP, 0);
                 sendingKey = false;
             }
