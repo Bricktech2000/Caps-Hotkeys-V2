@@ -191,12 +191,12 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam){
         }
         else if(wParam == WM_KEYUP /*key released*/ && kbdStruct.vkCode != modifierKey){
             //if shiftKey key was released, then release SHIFT
-            if(kbdStruct.vkCode == shiftKey){
+            if((const char)kbdStruct.vkCode == shiftKey){
                 if(shiftKeyHeld) keybd_event(VK_SHIFT, 0, KEYEVENTF_KEYUP, 0);
                 shiftKeyHeld = false;
             }
             //if winKey key was released, then release the Windows key
-            if(kbdStruct.vkCode == winKey){
+            if((const char)kbdStruct.vkCode == winKey){
                 if(winKeyHeld) keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, 0);
                 winKeyHeld = false;
             }
